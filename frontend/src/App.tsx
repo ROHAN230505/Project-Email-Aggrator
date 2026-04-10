@@ -6,6 +6,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import InboxPage from './pages/InboxPage';
+import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/inbox" /> : <LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
@@ -59,3 +61,4 @@ export default function App() {
     </QueryClientProvider>
   );
 }
+

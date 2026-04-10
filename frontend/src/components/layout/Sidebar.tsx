@@ -1,22 +1,26 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Inbox, Send, Star, Archive, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Mail, Inbox, Send, Star, Archive, Settings, LogOut,
+  ChevronLeft, ChevronRight, BarChart2, MailOpen,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import clsx from 'clsx';
 
 const navItems = [
-  { to: '/inbox', icon: Inbox, label: 'Inbox' },
-  { to: '/inbox?q=is:starred', icon: Star, label: 'Starred' },
-  { to: '/inbox?q=in:sent', icon: Send, label: 'Sent' },
-  { to: '/inbox?q=in:archive', icon: Archive, label: 'Archive' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',              icon: BarChart2,  label: 'Dashboard' },
+  { to: '/inbox',                  icon: Inbox,      label: 'Inbox' },
+  { to: '/inbox?q=in:all',         icon: MailOpen,   label: 'All Mail' },
+  { to: '/inbox?q=is:starred',     icon: Star,       label: 'Starred' },
+  { to: '/inbox?q=in:sent',        icon: Send,       label: 'Sent' },
+  { to: '/inbox?q=in:archive',     icon: Archive,    label: 'Archive' },
+  { to: '/settings',               icon: Settings,   label: 'Settings' },
 ];
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <motion.aside
@@ -99,7 +103,11 @@ export default function Sidebar() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition flex-shrink-0" title="Sign out">
+            <button
+              onClick={signOut}
+              className="p-1.5 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition flex-shrink-0"
+              title="Sign out"
+            >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -116,3 +124,4 @@ export default function Sidebar() {
     </motion.aside>
   );
 }
+

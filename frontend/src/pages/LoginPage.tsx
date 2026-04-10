@@ -1,8 +1,21 @@
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import { startGoogleLogin } from '../api/auth';
-import { Mail } from 'lucide-react';
+import { Mail, AlertCircle } from 'lucide-react';
+
+const ERROR_MESSAGES: Record<string, string> = {
+  access_denied: 'You declined access. Please try again and allow Gmail access.',
+  invalid_client: 'OAuth credentials are not configured. Check your backend .env file.',
+  no_code: 'Google did not return an authorization code. Please try again.',
+  fetch_user_failed: 'Signed in but could not fetch your profile. Please try again.',
+  unknown: 'An unexpected error occurred. Please try again.',
+};
 
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
+  const errorKey = searchParams.get('error');
+  const errorMsg = errorKey ? (ERROR_MESSAGES[errorKey] ?? `Error: ${errorKey}`) : null;
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
       {/* Background orbs */}
@@ -24,9 +37,21 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-3xl font-bold mb-2">Welcome back</h1>
-        <p className="text-slate-400 mb-10 text-sm">
+        <p className="text-slate-400 mb-8 text-sm">
           Sign in with your Google account to access your unified inbox.
         </p>
+
+        {/* Error message */}
+        {errorMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-6 text-left"
+          >
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-red-300 text-xs leading-relaxed">{errorMsg}</p>
+          </motion.div>
+        )}
 
         <motion.button
           whileHover={{ scale: 1.03 }}
@@ -44,9 +69,10 @@ export default function LoginPage() {
         </motion.button>
 
         <p className="mt-6 text-xs text-slate-500">
-          We only request read access to your Gmail. Your credentials never touch our servers.
+          We only request read/send access to your Gmail. Your password never touches our servers.
         </p>
       </motion.div>
     </div>
   );
 }
+

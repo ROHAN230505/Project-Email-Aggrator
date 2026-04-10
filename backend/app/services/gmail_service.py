@@ -251,3 +251,40 @@ async def refresh_and_return_tokens(encrypted_tokens: str) -> str:
         "refresh_token": creds.refresh_token,
     }
     return encrypt_tokens(new_tokens)
+
+
+# ── Stats ───────────────────────────────────────────────────────────────────
+
+# Labels whose counts we always surface
+_SYSTEM_LABELS = {"INBOX", "UNREAD", "STARRED", "SENT", "DRAFT", "SPAM", "TRASH"}
+
+
+def _sync_get_stats(creds: Credentials) -> dict:
+    """Return per-label message/thread counts from the Gmail labels API."""
+    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    labels_resp = service.users().labels().list(userId="me").execute()
+    all_labels = labels_resp.get("labels", [])
+
+    # Fetch detail only for system labels to keep it fast
+    result: dict[str, Any] = {}
+    for lbl in all_labels:
+        if lbl["id"] not in _SYSTEM_LABELS:
+            continue
+        detail = service.users().labels().get(userId="me", id=lbl["id"]).execute()
+        result[lbl["id"]] = {
+            "id": lbl["id"],
+            "name": detail.get("name", lbl["id"]),
+            "messages_total": detail.get("messagesTotal", 0),
+            "messages_unread": detail.get("messagesUnread", 0),
+            "threads_total": detail.get("threadsTotal", 0),
+            "threads_unread": detail.get("threadsUnread", 0),
+        }
+    return result
+
+
+async def get_stats(encrypted_tokens: str) -> dict:
+    """Return real-time Gmail stats (label counts)."""
+    tokens = decrypt_tokens(encrypted_tokens)
+    creds = _build_credentials(tokens)
+    creds = await asyncio.to_thread(_refresh_if_needed, creds)
+    return await asyncio.to_thread(_sync_get_stats, creds)

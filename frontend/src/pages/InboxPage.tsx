@@ -1,21 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, RefreshCw, ChevronRight, X } from 'lucide-react';
+import { Search, RefreshCw, ChevronDown, BarChart2 } from 'lucide-react';
 import { listMails } from '../api/mails';
 import EmailCard from '../components/email/EmailCard';
 import MailDetailPanel from '../components/email/MailDetailPanel';
 import Layout from '../components/layout/Layout';
 import type { Mail } from '../types';
 import clsx from 'clsx';
+import { useNavigate } from 'react-router-dom';
 
 const TABS = [
-  { label: 'Inbox', q: 'in:inbox' },
-  { label: 'Unread', q: 'is:unread' },
-  { label: 'Starred', q: 'is:starred' },
-  { label: 'Sent', q: 'in:sent' },
+  { label: 'Inbox',    q: 'in:inbox' },
+  { label: 'All Mail', q: 'in:all' },
+  { label: 'Unread',   q: 'is:unread' },
+  { label: 'Starred',  q: 'is:starred' },
+  { label: 'Sent',     q: 'in:sent' },
 ];
+
+const PAGE_SIZE = 100;
 
 export default function InboxPage() {
   const [searchParams] = useSearchParams();
@@ -23,32 +27,106 @@ export default function InboxPage() {
   const [searchInput, setSearchInput] = useState('');
   const [activeQuery, setActiveQuery] = useState(searchParams.get('q') ?? 'in:inbox');
   const [selectedMail, setSelectedMail] = useState<Mail | null>(null);
+  const [pageToken, setPageToken] = useState<string | undefined>(undefined);
+  const [allMessages, setAllMessages] = useState<Mail[]>([]);
+
+  // Sync query from URL search params on navigation from Sidebar
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && q !== activeQuery) {
+      setActiveQuery(q);
+      setPageToken(undefined);
+      setAllMessages([]);
+      setSelectedMail(null);
+    }
+  }, [searchParams.get('q')]);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['mails', activeQuery],
-    queryFn: () => listMails(activeQuery, 50),
+    queryKey: ['mails', activeQuery, pageToken],
+    queryFn: () => listMails(activeQuery, PAGE_SIZE, pageToken),
+    // Don't auto-refetch on window focus — user controls refresh
+    refetchOnWindowFocus: false,
   });
+
+  // Accumulate pages
+  useEffect(() => {
+    if (data?.messages) {
+      if (pageToken === undefined) {
+        // First page — replace
+        setAllMessages(data.messages);
+      } else {
+        // Subsequent page — append, deduplicating by id
+        setAllMessages(prev => {
+          const existing = new Set(prev.map(m => m.id));
+          return [...prev, ...data.messages.filter(m => !existing.has(m.id))];
+        });
+      }
+    }
+  }, [data]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchInput.trim()) setActiveQuery(searchInput.trim());
+    if (searchInput.trim()) {
+      setActiveQuery(searchInput.trim());
+      setPageToken(undefined);
+      setAllMessages([]);
+      setSelectedMail(null);
+    }
+  };
+
+  const handleTabChange = (q: string) => {
+    setActiveQuery(q);
+    setPageToken(undefined);
+    setAllMessages([]);
+    setSelectedMail(null);
+    setSearchInput('');
+  };
+
+  const handleLoadMore = () => {
+    if (data?.next_page_token) {
+      setPageToken(data.next_page_token);
+    }
+  };
+
+  const handleRefresh = () => {
+    setPageToken(undefined);
+    setAllMessages([]);
+    setSelectedMail(null);
+    refetch();
   };
 
   return (
     <Layout>
       <div className="flex h-full">
         {/* Mail list panel */}
-        <div className={clsx('flex flex-col border-r border-white/5 transition-all duration-300', selectedMail ? 'w-80 flex-shrink-0' : 'flex-1')}>
+        <div className={clsx('flex flex-col border-r border-white/5 transition-all duration-300 min-w-0', selectedMail ? 'w-80 flex-shrink-0' : 'flex-1')}>
           {/* Header */}
           <div className="px-5 pt-5 pb-3 border-b border-white/5">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold">Inbox</h1>
-              <button
-                onClick={() => refetch()}
-                className={clsx('p-2 rounded-lg hover:bg-white/5 transition', isFetching && 'animate-spin')}
-              >
-                <RefreshCw className="w-4 h-4 text-slate-400" />
-              </button>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-bold">Mail</h1>
+                {allMessages.length > 0 && (
+                  <span className="text-xs text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
+                    {allMessages.length}{data?.next_page_token ? '+' : ''} messages
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="p-2 rounded-lg hover:bg-white/5 transition"
+                  title="Dashboard & Stats"
+                >
+                  <BarChart2 className="w-4 h-4 text-slate-400" />
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  className={clsx('p-2 rounded-lg hover:bg-white/5 transition', isFetching && 'animate-spin')}
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
             </div>
 
             {/* Search */}
@@ -57,17 +135,17 @@ export default function InboxPage() {
               <input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search emails…"
-                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:border-accent-purple/50 focus:bg-white/8 transition"
+                placeholder="Search emails… (Gmail syntax supported)"
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:border-accent-purple/50 transition"
               />
             </form>
 
             {/* Tabs */}
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               {TABS.map(tab => (
                 <button
                   key={tab.q}
-                  onClick={() => { setActiveQuery(tab.q); setSelectedMail(null); }}
+                  onClick={() => handleTabChange(tab.q)}
                   className={clsx(
                     'px-3 py-1.5 rounded-lg text-xs font-medium transition',
                     activeQuery === tab.q
@@ -83,9 +161,9 @@ export default function InboxPage() {
 
           {/* Email list */}
           <div className="flex-1 overflow-auto">
-            {isLoading && (
+            {isLoading && allMessages.length === 0 && (
               <div className="flex flex-col gap-3 p-4">
-                {Array.from({ length: 8 }).map((_, i) => (
+                {Array.from({ length: 10 }).map((_, i) => (
                   <div key={i} className="flex gap-3 animate-pulse">
                     <div className="w-9 h-9 rounded-full bg-white/10 flex-shrink-0" />
                     <div className="flex-1 space-y-2">
@@ -101,18 +179,18 @@ export default function InboxPage() {
               <div className="p-8 text-center">
                 <p className="text-red-400 text-sm mb-3">Failed to load emails</p>
                 <p className="text-slate-500 text-xs mb-4">{(error as Error).message}</p>
-                <button onClick={() => refetch()} className="px-4 py-2 bg-accent-purple/20 text-accent-purple rounded-lg text-sm hover:bg-accent-purple/30 transition">
+                <button onClick={handleRefresh} className="px-4 py-2 bg-accent-purple/20 text-accent-purple rounded-lg text-sm hover:bg-accent-purple/30 transition">
                   Retry
                 </button>
               </div>
             )}
-            {!isLoading && !error && data?.messages.length === 0 && (
+            {!isLoading && !error && allMessages.length === 0 && (
               <div className="p-8 text-center">
                 <div className="text-4xl mb-3">📭</div>
                 <p className="text-slate-400 text-sm">No emails found</p>
               </div>
             )}
-            {data?.messages.map(mail => (
+            {allMessages.map(mail => (
               <EmailCard
                 key={mail.id}
                 mail={mail}
@@ -120,6 +198,29 @@ export default function InboxPage() {
                 onClick={() => setSelectedMail(mail)}
               />
             ))}
+
+            {/* Load More */}
+            {data?.next_page_token && (
+              <div className="p-4 text-center">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isFetching}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isFetching ? (
+                    <>
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+                      Loading…
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4" />
+                      Load more emails
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -140,8 +241,8 @@ export default function InboxPage() {
           )}
         </AnimatePresence>
 
-        {/* Empty state when nothing selected and not loading */}
-        {!selectedMail && !isLoading && data?.messages && data.messages.length > 0 && (
+        {/* Empty-state placeholder when nothing selected */}
+        {!selectedMail && !isLoading && allMessages.length > 0 && (
           <div className="hidden lg:flex flex-1 items-center justify-center text-slate-600">
             <div className="text-center">
               <div className="text-5xl mb-3">✉️</div>
@@ -153,3 +254,4 @@ export default function InboxPage() {
     </Layout>
   );
 }
+

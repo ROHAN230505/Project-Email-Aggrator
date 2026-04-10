@@ -1,9 +1,9 @@
 import { apiClient } from './client';
-import type { Mail, MailListResponse } from '../types';
+import type { Mail, MailListResponse, MailStats } from '../types';
 
 export const listMails = async (
   q = 'in:inbox',
-  maxResults = 50,
+  maxResults = 100,
   pageToken?: string
 ): Promise<MailListResponse> => {
   const { data } = await apiClient.get<MailListResponse>('/mails', {
@@ -22,6 +22,11 @@ export const getThread = async (threadId: string): Promise<Mail[]> => {
   return data;
 };
 
+export const getStats = async (): Promise<MailStats> => {
+  const { data } = await apiClient.get<MailStats>('/mails/stats');
+  return data;
+};
+
 export const sendMail = async (payload: {
   to: string;
   subject: string;
@@ -31,3 +36,4 @@ export const sendMail = async (payload: {
   const { data } = await apiClient.post('/mails/send', payload);
   return data;
 };
+

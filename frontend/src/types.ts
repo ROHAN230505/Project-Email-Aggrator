@@ -39,3 +39,16 @@ export interface MailListResponse {
   next_page_token: string | null;
   result_size_estimate: number;
 }
+
+export interface LabelStat {
+  id: string;
+  name: string;
+  messages_total: number;
+  messages_unread: number;
+  threads_total: number;
+  threads_unread: number;
+}
+
+/** Keyed by Gmail label id, e.g. "INBOX", "UNREAD", "STARRED", "SENT" */
+export type MailStats = Record<string, LabelStat>;
+
